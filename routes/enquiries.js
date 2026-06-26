@@ -12,7 +12,7 @@
 
    Email sending uses Nodemailer with Gmail. To make this work,
    you'll need a free "Gmail App Password" (NOT your normal Gmail
-   password) — I'll walk you through that step when we deploy.
+   password) — which is already configured in your environment.
    ============================================================ */
 
 const express = require('express');
@@ -26,23 +26,23 @@ function isValidEmail(email) {
   return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
 }
 
-// Configure the email sender with explicit connection limits to prevent hanging
+// Configure the email sender using Port 465 to bypass cloud hosting restrictions
 let transporter = null;
 if (process.env.GMAIL_USER && process.env.GMAIL_APP_PASSWORD) {
   transporter = nodemailer.createTransport({
     service: 'gmail',
     host: 'smtp.gmail.com',
-    port: 587,
-    secure: false, // true for port 465, false for other ports like 587
+    port: 465,         // Secure SSL Port (bypasses Render's default outbound blocks)
+    secure: true,      // Set to true because port 465 requires native SSL/TLS
     auth: {
       user: process.env.GMAIL_USER,
       pass: process.env.GMAIL_APP_PASSWORD
     },
     tls: {
-      rejectUnauthorized: false // Prevents cloud hosting certificate blocks
+      rejectUnauthorized: false // Helps prevent SSL certificate restrictions on cloud platforms
     },
-    connectionTimeout: 10000, // 10 seconds limit to establish socket connection
-    greetingTimeout: 10000    // 10 seconds limit to wait for SMTP greeting
+    connectionTimeout: 10000, // 10 seconds timeout limit so it errors out quickly if blocked
+    greetingTimeout: 10000    // 10 seconds limit to wait for SMTP greetings
   });
 }
 
@@ -58,6 +58,7 @@ router.post('/', async (req, res) => {
   }
 
   try {
+    // 1. Save the enquiry permanently inside the SQLite database
     const insert = db.prepare(`
       INSERT INTO enquiries (name, email, subject, message, product_name, status)
       VALUES (?, ?, ?, ?, ?, 'new')
@@ -72,7 +73,7 @@ router.post('/', async (req, res) => {
 
     let emailSentSuccessfully = true;
 
-    // Try to email the business owner.
+    // 2. Try to dispatch the email to your business address via the SSL tunnel
     if (transporter && process.env.NOTIFY_EMAIL) {
       try {
         await transporter.sendMail({
@@ -87,11 +88,10 @@ router.post('/', async (req, res) => {
         emailSentSuccessfully = false;
       }
     } else {
-      // If environment keys are totally missing, mark as failed so frontend knows
       emailSentSuccessfully = false; 
     }
 
-    // Prepare response data payload
+    // Compile payload status response
     const responsePayload = { 
       enquiry: { 
         id: result.lastInsertRowid, 
@@ -102,13 +102,13 @@ router.post('/', async (req, res) => {
       } 
     };
 
-    // If database insertion succeeded but email failed/timed out, send a 207 status
+    // If data was written to DB successfully but Gmail transmission timed out / failed
     if (!emailSentSuccessfully) {
       responsePayload.emailFailed = true;
-      return res.status(207).json(responsePayload);
+      return res.status(207).json(responsePayload); // Matches the product-extras.js graceful error UI handler
     }
 
-    // Standard absolute success response
+    // Absolute immediate deployment success response
     return res.status(201).json(responsePayload);
 
   } catch (dbError) {
