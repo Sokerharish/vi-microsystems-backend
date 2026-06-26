@@ -26,17 +26,23 @@ function isValidEmail(email) {
   return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
 }
 
-// Configure the email sender. If these environment variables aren't
-// set, email sending is skipped (but the enquiry is still saved to
-// the database, so nothing is lost either way).
+// Configure the email sender with explicit connection limits to prevent hanging
 let transporter = null;
 if (process.env.GMAIL_USER && process.env.GMAIL_APP_PASSWORD) {
   transporter = nodemailer.createTransport({
     service: 'gmail',
+    host: 'smtp.gmail.com',
+    port: 587,
+    secure: false, // true for port 465, false for other ports like 587
     auth: {
       user: process.env.GMAIL_USER,
       pass: process.env.GMAIL_APP_PASSWORD
-    }
+    },
+    tls: {
+      rejectUnauthorized: false // Prevents cloud hosting certificate blocks
+    },
+    connectionTimeout: 10000, // 10 seconds limit to establish socket connection
+    greetingTimeout: 10000    // 10 seconds limit to wait for SMTP greeting
   });
 }
 
@@ -51,44 +57,64 @@ router.post('/', async (req, res) => {
     return res.status(400).json({ error: 'Please enter a valid email address.' });
   }
 
-  const insert = db.prepare(`
-    INSERT INTO enquiries (name, email, subject, message, product_name, status)
-    VALUES (?, ?, ?, ?, ?, 'new')
-  `);
-  const result = insert.run(
-    name.trim(),
-    email.trim().toLowerCase(),
-    subject || null,
-    message.trim(),
-    productName || null
-  );
+  try {
+    const insert = db.prepare(`
+      INSERT INTO enquiries (name, email, subject, message, product_name, status)
+      VALUES (?, ?, ?, ?, ?, 'new')
+    `);
+    const result = insert.run(
+      name.trim(),
+      email.trim().toLowerCase(),
+      subject || null,
+      message.trim(),
+      productName || null
+    );
 
-  // Try to email the business owner. If this fails for any reason
-  // (e.g. email not configured yet), we still tell the visitor it
-  // succeeded, since the enquiry is safely saved in the database
-  // regardless and you (the owner) can check it there.
-  if (transporter && process.env.NOTIFY_EMAIL) {
-    try {
-      await transporter.sendMail({
-        from: process.env.GMAIL_USER,
-        to: process.env.NOTIFY_EMAIL,
-        replyTo: email,
-        subject: subject || `New enquiry: ${productName || 'General'}`,
-        text: `New enquiry received on the website.
+    let emailSentSuccessfully = true;
 
-Name: ${name}
-Email: ${email}
-Product: ${productName || 'N/A'}
-
-Message:
-${message}`
-      });
-    } catch (err) {
-      console.error('Failed to send enquiry email (enquiry was still saved):', err.message);
+    // Try to email the business owner.
+    if (transporter && process.env.NOTIFY_EMAIL) {
+      try {
+        await transporter.sendMail({
+          from: process.env.GMAIL_USER,
+          to: process.env.NOTIFY_EMAIL,
+          replyTo: email,
+          subject: subject || `New enquiry: ${productName || 'General'}`,
+          text: `New enquiry received on the website.\n\nName: ${name}\nEmail: ${email}\nProduct: ${productName || 'N/A'}\n\nMessage:\n${message}`
+        });
+      } catch (err) {
+        console.error('Failed to send enquiry email (enquiry was still saved):', err.message);
+        emailSentSuccessfully = false;
+      }
+    } else {
+      // If environment keys are totally missing, mark as failed so frontend knows
+      emailSentSuccessfully = false; 
     }
-  }
 
-  res.status(201).json({ enquiry: { id: result.lastInsertRowid, name, email, subject, productName } });
+    // Prepare response data payload
+    const responsePayload = { 
+      enquiry: { 
+        id: result.lastInsertRowid, 
+        name, 
+        email, 
+        subject, 
+        productName 
+      } 
+    };
+
+    // If database insertion succeeded but email failed/timed out, send a 207 status
+    if (!emailSentSuccessfully) {
+      responsePayload.emailFailed = true;
+      return res.status(207).json(responsePayload);
+    }
+
+    // Standard absolute success response
+    return res.status(201).json(responsePayload);
+
+  } catch (dbError) {
+    console.error('Database Error:', dbError.message);
+    return res.status(500).json({ error: 'Failed to record your enquiry in our database.' });
+  }
 });
 
 module.exports = router;
