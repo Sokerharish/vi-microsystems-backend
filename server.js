@@ -6,6 +6,7 @@
 require('dotenv').config();
 const express = require('express');
 const cors = require('cors');
+const { prepare } = require('./db/setup');
 
 const authRoutes = require('./routes/auth');
 const orderRoutes = require('./routes/orders');
@@ -50,6 +51,16 @@ app.use((err, req, res, next) => {
   console.error(err);
   res.status(500).json({ error: 'Something went wrong on our end. Please try again.' });
 });
+
+// Auto-seed database on startup if products table is empty
+const db = { prepare };
+const checkProducts = db.prepare('SELECT COUNT(*) as count FROM products');
+const productCount = checkProducts.get();
+
+if (productCount.count === 0) {
+  console.log('Database is empty. Running seed...');
+  require('./seed');
+}
 
 app.listen(PORT, () => {
   console.log(`Vi Microsystems backend listening on port ${PORT}`);
