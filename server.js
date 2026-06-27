@@ -24,7 +24,8 @@ const PORT = process.env.PORT || 3000;
 // with your actual site's URL for better security — I'll show you
 // how when we deploy.
 app.use(cors({
-  origin: process.env.ALLOWED_ORIGIN || '*'
+  origin: '*',
+  credentials: true
 }));
 
 app.use(express.json());
