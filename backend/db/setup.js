@@ -80,58 +80,6 @@ db.exec(`
   )
 `);
 
-// ---------- PRODUCTS TABLE ----------
-// Product catalog with pricing, descriptions, and metadata
-db.exec(`
-  CREATE TABLE IF NOT EXISTS products (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    product_id TEXT NOT NULL UNIQUE,
-    name TEXT NOT NULL,
-    description TEXT,
-    price_inr REAL,
-    is_placeholder INTEGER DEFAULT 0,
-    image_url TEXT,
-    page_url TEXT,
-    category TEXT,
-    specifications TEXT,
-    stock_quantity INTEGER DEFAULT 0,
-    is_active INTEGER DEFAULT 1,
-    created_at TEXT NOT NULL DEFAULT (datetime('now')),
-    updated_at TEXT NOT NULL DEFAULT (datetime('now'))
-  )
-`);
-
-// ---------- BLOG POSTS TABLE ----------
-// Blog articles for the website
-db.exec(`
-  CREATE TABLE IF NOT EXISTS blog_posts (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    title TEXT NOT NULL,
-    slug TEXT NOT NULL UNIQUE,
-    excerpt TEXT,
-    content TEXT NOT NULL,
-    author TEXT,
-    image_url TEXT,
-    category TEXT,
-    is_published INTEGER DEFAULT 0,
-    published_at TEXT,
-    created_at TEXT NOT NULL DEFAULT (datetime('now')),
-    updated_at TEXT NOT NULL DEFAULT (datetime('now'))
-  )
-`);
-
-// ---------- NEWSLETTER SUBSCRIPTIONS TABLE ----------
-// Email subscribers for newsletters
-db.exec(`
-  CREATE TABLE IF NOT EXISTS newsletter_subscribers (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    email TEXT NOT NULL UNIQUE,
-    name TEXT,
-    subscribed_at TEXT NOT NULL DEFAULT (datetime('now')),
-    is_active INTEGER DEFAULT 1
-  )
-`);
-
 console.log('Database ready: tables created (or already existed).');
 
 /* ------------------------------------------------------------

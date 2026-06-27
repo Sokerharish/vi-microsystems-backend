@@ -10,11 +10,6 @@ const cors = require('cors');
 const authRoutes = require('./routes/auth');
 const orderRoutes = require('./routes/orders');
 const enquiryRoutes = require('./routes/enquiries');
-const productRoutes = require('./routes/products');
-const blogRoutes = require('./routes/blog');
-const newsletterRoutes = require('./routes/newsletter');
-const adminRoutes = require('./routes/admin');
-const userRoutes = require('./routes/users');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -37,11 +32,6 @@ app.get('/', (req, res) => {
 app.use('/api/auth', authRoutes);
 app.use('/api/orders', orderRoutes);
 app.use('/api/enquiries', enquiryRoutes);
-app.use('/api/products', productRoutes);
-app.use('/api/blog', blogRoutes);
-app.use('/api/newsletter', newsletterRoutes);
-app.use('/api/admin', adminRoutes);
-app.use('/api/users', userRoutes);
 
 // Catch-all error handler — so unexpected errors return a clean
 // JSON response instead of crashing the server or leaking details.
