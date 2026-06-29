@@ -41,8 +41,8 @@ if (process.env.GMAIL_USER && process.env.GMAIL_APP_PASSWORD) {
     tls: {
       rejectUnauthorized: false // Helps prevent SSL certificate restrictions on cloud platforms
     },
-    connectionTimeout: 10000, // 10 seconds timeout limit so it errors out quickly if blocked
-    greetingTimeout: 10000    // 10 seconds limit to wait for SMTP greetings
+    connectionTimeout: 30000, // 30 seconds timeout limit for better reliability
+    greetingTimeout: 15000    // 15 seconds limit to wait for SMTP greetings
   });
 }
 
